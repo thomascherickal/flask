@@ -1,24 +1,11 @@
-# -*- coding: utf-8 -*-
-"""
-    flask.blueprints
-    ~~~~~~~~~~~~~~~~
-
-    Blueprints are the recommended way to implement larger or more
-    pluggable applications in Flask 0.7 and later.
-
-    :copyright: 2010 Pallets
-    :license: BSD-3-Clause
-"""
 from functools import update_wrapper
 
-from .helpers import _endpoint_from_view_func
-from .helpers import _PackageBoundObject
-
-# a singleton sentinel value for parameter defaults
-_sentinel = object()
+from .scaffold import _endpoint_from_view_func
+from .scaffold import _sentinel
+from .scaffold import Scaffold
 
 
-class BlueprintSetupState(object):
+class BlueprintSetupState:
     """Temporary holder object for registering a blueprint with the
     application.  An instance of this class is created by the
     :meth:`~flask.Blueprint.make_setup_state` method and later passed
@@ -80,14 +67,14 @@ class BlueprintSetupState(object):
             defaults = dict(defaults, **options.pop("defaults"))
         self.app.add_url_rule(
             rule,
-            "%s.%s" % (self.blueprint.name, endpoint),
+            f"{self.blueprint.name}.{endpoint}",
             view_func,
             defaults=defaults,
-            **options
+            **options,
         )
 
 
-class Blueprint(_PackageBoundObject):
+class Blueprint(Scaffold):
     """Represents a blueprint, a collection of routes and other
     app-related functions that can be registered on a real application
     later.
@@ -101,7 +88,7 @@ class Blueprint(_PackageBoundObject):
     that is called with :class:`~flask.blueprints.BlueprintSetupState`
     when the blueprint is registered on an application.
 
-    See :ref:`blueprints` for more information.
+    See :doc:`/blueprints` for more information.
 
     .. versionchanged:: 1.1.0
         Blueprints have a ``cli`` group to register nested CLI commands.
@@ -134,7 +121,7 @@ class Blueprint(_PackageBoundObject):
         default.
     :param url_defaults: A dict of default values that blueprint routes
         will receive by default.
-    :param root_path: By default, the blueprint will automatically this
+    :param root_path: By default, the blueprint will automatically set this
         based on ``import_name``. In certain situations this automatic
         detection can fail, so the path can be specified manually
         instead.
@@ -178,19 +165,24 @@ class Blueprint(_PackageBoundObject):
         root_path=None,
         cli_group=_sentinel,
     ):
-        _PackageBoundObject.__init__(
-            self, import_name, template_folder, root_path=root_path
+        super().__init__(
+            import_name=import_name,
+            static_folder=static_folder,
+            static_url_path=static_url_path,
+            template_folder=template_folder,
+            root_path=root_path,
         )
         self.name = name
         self.url_prefix = url_prefix
         self.subdomain = subdomain
-        self.static_folder = static_folder
-        self.static_url_path = static_url_path
         self.deferred_functions = []
         if url_defaults is None:
             url_defaults = {}
         self.url_values_defaults = url_defaults
         self.cli_group = cli_group
+
+    def _is_setup_finished(self):
+        return self.warn_on_modifications and self._got_registered_once
 
     def record(self, func):
         """Registers a function that is called when the blueprint is
@@ -247,10 +239,40 @@ class Blueprint(_PackageBoundObject):
 
         if self.has_static_folder:
             state.add_url_rule(
-                self.static_url_path + "/<path:filename>",
+                f"{self.static_url_path}/<path:filename>",
                 view_func=self.send_static_file,
                 endpoint="static",
             )
+
+        # Merge app and self dictionaries.
+        def merge_dict_lists(self_dict, app_dict):
+            """Merges self_dict into app_dict. Replaces None keys with self.name.
+            Values of dict must be lists.
+            """
+            for key, values in self_dict.items():
+                key = self.name if key is None else f"{self.name}.{key}"
+                app_dict.setdefault(key, []).extend(values)
+
+        def merge_dict_nested(self_dict, app_dict):
+            """Merges self_dict into app_dict. Replaces None keys with self.name.
+            Values of dict must be dict.
+            """
+            for key, value in self_dict.items():
+                key = self.name if key is None else f"{self.name}.{key}"
+                app_dict[key] = value
+
+        app.view_functions.update(self.view_functions)
+
+        merge_dict_lists(self.before_request_funcs, app.before_request_funcs)
+        merge_dict_lists(self.after_request_funcs, app.after_request_funcs)
+        merge_dict_lists(self.teardown_request_funcs, app.teardown_request_funcs)
+        merge_dict_lists(self.url_default_functions, app.url_default_functions)
+        merge_dict_lists(self.url_value_preprocessors, app.url_value_preprocessors)
+        merge_dict_lists(
+            self.template_context_processors, app.template_context_processors
+        )
+
+        merge_dict_nested(self.error_handler_spec, app.error_handler_spec)
 
         for deferred in self.deferred_functions:
             deferred(state)
@@ -269,18 +291,6 @@ class Blueprint(_PackageBoundObject):
             self.cli.name = cli_resolved_group
             app.cli.add_command(self.cli)
 
-    def route(self, rule, **options):
-        """Like :meth:`Flask.route` but for a blueprint.  The endpoint for the
-        :func:`url_for` function is prefixed with the name of the blueprint.
-        """
-
-        def decorator(f):
-            endpoint = options.pop("endpoint", f.__name__)
-            self.add_url_rule(rule, endpoint, f, **options)
-            return f
-
-        return decorator
-
     def add_url_rule(self, rule, endpoint=None, view_func=None, **options):
         """Like :meth:`Flask.add_url_rule` but for a blueprint.  The endpoint for
         the :func:`url_for` function is prefixed with the name of the blueprint.
@@ -292,23 +302,6 @@ class Blueprint(_PackageBoundObject):
                 "." not in view_func.__name__
             ), "Blueprint view function name should not contain dots"
         self.record(lambda s: s.add_url_rule(rule, endpoint, view_func, **options))
-
-    def endpoint(self, endpoint):
-        """Like :meth:`Flask.endpoint` but for a blueprint.  This does not
-        prefix the endpoint with the blueprint name, this has to be done
-        explicitly by the user of this method.  If the endpoint is prefixed
-        with a `.` it will be registered to the current blueprint, otherwise
-        it's an application independent endpoint.
-        """
-
-        def decorator(f):
-            def register_endpoint(state):
-                state.app.view_functions[endpoint] = f
-
-            self.record_once(register_endpoint)
-            return f
-
-        return decorator
 
     def app_template_filter(self, name=None):
         """Register a custom template filter, available application wide.  Like
@@ -402,16 +395,6 @@ class Blueprint(_PackageBoundObject):
 
         self.record_once(register_template)
 
-    def before_request(self, f):
-        """Like :meth:`Flask.before_request` but for a blueprint.  This function
-        is only executed before each request that is handled by a function of
-        that blueprint.
-        """
-        self.record_once(
-            lambda s: s.app.before_request_funcs.setdefault(self.name, []).append(f)
-        )
-        return f
-
     def before_app_request(self, f):
         """Like :meth:`Flask.before_request`.  Such a function is executed
         before each request, even if outside of a blueprint.
@@ -428,34 +411,12 @@ class Blueprint(_PackageBoundObject):
         self.record_once(lambda s: s.app.before_first_request_funcs.append(f))
         return f
 
-    def after_request(self, f):
-        """Like :meth:`Flask.after_request` but for a blueprint.  This function
-        is only executed after each request that is handled by a function of
-        that blueprint.
-        """
-        self.record_once(
-            lambda s: s.app.after_request_funcs.setdefault(self.name, []).append(f)
-        )
-        return f
-
     def after_app_request(self, f):
         """Like :meth:`Flask.after_request` but for a blueprint.  Such a function
         is executed after each request, even if outside of the blueprint.
         """
         self.record_once(
             lambda s: s.app.after_request_funcs.setdefault(None, []).append(f)
-        )
-        return f
-
-    def teardown_request(self, f):
-        """Like :meth:`Flask.teardown_request` but for a blueprint.  This
-        function is only executed when tearing down requests handled by a
-        function of that blueprint.  Teardown request functions are executed
-        when the request context is popped, even when no actual request was
-        performed.
-        """
-        self.record_once(
-            lambda s: s.app.teardown_request_funcs.setdefault(self.name, []).append(f)
         )
         return f
 
@@ -466,17 +427,6 @@ class Blueprint(_PackageBoundObject):
         """
         self.record_once(
             lambda s: s.app.teardown_request_funcs.setdefault(None, []).append(f)
-        )
-        return f
-
-    def context_processor(self, f):
-        """Like :meth:`Flask.context_processor` but for a blueprint.  This
-        function is only executed for requests handled by a blueprint.
-        """
-        self.record_once(
-            lambda s: s.app.template_context_processors.setdefault(
-                self.name, []
-            ).append(f)
         )
         return f
 
@@ -500,26 +450,6 @@ class Blueprint(_PackageBoundObject):
 
         return decorator
 
-    def url_value_preprocessor(self, f):
-        """Registers a function as URL value preprocessor for this
-        blueprint.  It's called before the view functions are called and
-        can modify the url values provided.
-        """
-        self.record_once(
-            lambda s: s.app.url_value_preprocessors.setdefault(self.name, []).append(f)
-        )
-        return f
-
-    def url_defaults(self, f):
-        """Callback function for URL defaults for this blueprint.  It's called
-        with the endpoint and values and should update the values passed
-        in place.
-        """
-        self.record_once(
-            lambda s: s.app.url_default_functions.setdefault(self.name, []).append(f)
-        )
-        return f
-
     def app_url_value_preprocessor(self, f):
         """Same as :meth:`url_value_preprocessor` but application wide.
         """
@@ -535,35 +465,3 @@ class Blueprint(_PackageBoundObject):
             lambda s: s.app.url_default_functions.setdefault(None, []).append(f)
         )
         return f
-
-    def errorhandler(self, code_or_exception):
-        """Registers an error handler that becomes active for this blueprint
-        only.  Please be aware that routing does not happen local to a
-        blueprint so an error handler for 404 usually is not handled by
-        a blueprint unless it is caused inside a view function.  Another
-        special case is the 500 internal server error which is always looked
-        up from the application.
-
-        Otherwise works as the :meth:`~flask.Flask.errorhandler` decorator
-        of the :class:`~flask.Flask` object.
-        """
-
-        def decorator(f):
-            self.record_once(
-                lambda s: s.app._register_error_handler(self.name, code_or_exception, f)
-            )
-            return f
-
-        return decorator
-
-    def register_error_handler(self, code_or_exception, f):
-        """Non-decorator version of the :meth:`errorhandler` error attach
-        function, akin to the :meth:`~flask.Flask.register_error_handler`
-        application-wide function of the :class:`~flask.Flask` object but
-        for error handlers limited to this blueprint.
-
-        .. versionadded:: 0.11
-        """
-        self.record_once(
-            lambda s: s.app._register_error_handler(self.name, code_or_exception, f)
-        )

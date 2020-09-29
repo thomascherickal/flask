@@ -1,5 +1,3 @@
-.. _blueprints:
-
 Modular Applications with Blueprints
 ====================================
 
@@ -37,8 +35,9 @@ Blueprints in Flask are intended for these cases:
 A blueprint in Flask is not a pluggable app because it is not actually an
 application -- it's a set of operations which can be registered on an
 application, even multiple times.  Why not have multiple application
-objects?  You can do that (see :ref:`app-dispatch`), but your applications
-will have separate configs and will be managed at the WSGI layer.
+objects?  You can do that (see :doc:`/patterns/appdispatch`), but your
+applications will have separate configs and will be managed at the WSGI
+layer.
 
 Blueprints instead provide separation at the Flask level, share
 application config, and can change an application object as necessary with
@@ -243,8 +242,9 @@ you can use relative redirects by prefixing the endpoint with a dot only::
 This will link to ``admin.index`` for instance in case the current request
 was dispatched to any other admin blueprint endpoint.
 
-Error Handlers
---------------
+
+Blueprint Error Handlers
+------------------------
 
 Blueprints support the ``errorhandler`` decorator just like the :class:`Flask`
 application object, so it is easy to make Blueprint-specific custom error
@@ -274,4 +274,4 @@ at the application level using the ``request`` proxy object::
         else:
             return ex
 
-More information on error handling see :ref:`errorpages`.
+See :doc:`/errorhandling`.

@@ -27,9 +27,10 @@ their :file:`setup.py` files.
 But what do extensions look like themselves?  An extension has to ensure
 that it works with multiple Flask application instances at once.  This is
 a requirement because many people will use patterns like the
-:ref:`app-factories` pattern to create their application as needed to aid
-unittests and to support multiple configurations.  Because of that it is
-crucial that your application supports that kind of behavior.
+:doc:`/patterns/appfactories` pattern to create their application as
+needed to aid unittests and to support multiple configurations. Because
+of that it is crucial that your application supports that kind of
+behavior.
 
 Most importantly the extension must be shipped with a :file:`setup.py` file and
 registered on PyPI.  Also the development checkout link should work so
@@ -117,8 +118,8 @@ Initializing Extensions
 
 Many extensions will need some kind of initialization step.  For example,
 consider an application that's currently connecting to SQLite like the
-documentation suggests (:ref:`sqlite3`).  So how does the extension
-know the name of the application object?
+documentation suggests (:doc:`/patterns/sqlite3`). So how does the
+extension know the name of the application object?
 
 Quite simple: you pass it to it.
 
@@ -331,5 +332,5 @@ ecosystem remain consistent and compatible.
 .. _PyPI: https://pypi.org/search/?c=Framework+%3A%3A+Flask
 .. _OAuth extension: https://pythonhosted.org/Flask-OAuth/
 .. _mailinglist: https://mail.python.org/mailman/listinfo/flask
-.. _Discord server: https://discord.gg/t6rrQZH
+.. _Discord server: https://discord.gg/pallets
 .. _Official Pallets Themes: https://pypi.org/project/Pallets-Sphinx-Themes/

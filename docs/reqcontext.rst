@@ -1,7 +1,5 @@
 .. currentmodule:: flask
 
-.. _request-context:
-
 The Request Context
 ===================
 
@@ -199,7 +197,7 @@ contexts until the ``with`` block exits.
         print(request.path)
 
     # the contexts are popped and teardown functions are called after
-    # the client with block exists
+    # the client with block exits
 
 Signals
 ~~~~~~~
@@ -251,13 +249,14 @@ point to the unique object bound to each worker behind the scenes as
 described on this page.
 
 Most of the time you don't have to care about that, but there are some
-exceptions where it is good to know that this object is an actual proxy:
+exceptions where it is good to know that this object is actually a proxy:
 
 -   The proxy objects cannot fake their type as the actual object types.
     If you want to perform instance checks, you have to do that on the
     object being proxied.
--   If the specific object reference is important, for example for
-    sending :ref:`signals` or passing data to a background thread.
+-   The reference to the proxied object is needed in some situations,
+    such as sending :doc:`signals` or passing data to a background
+    thread.
 
 If you need to access the underlying object that is proxied, use the
 :meth:`~werkzeug.local.LocalProxy._get_current_object` method::

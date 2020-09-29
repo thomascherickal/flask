@@ -1,5 +1,3 @@
-.. _uploading-files:
-
 Uploading Files
 ===============
 
@@ -39,7 +37,7 @@ Why do we limit the extensions that are allowed?  You probably don't want
 your users to be able to upload everything there if the server is directly
 sending out the data to the client.  That way you can make sure that users
 are not able to upload HTML files that would cause XSS problems (see
-:ref:`xss`).  Also make sure to disallow ``.php`` files if the server
+:ref:`security-xss`).  Also make sure to disallow ``.php`` files if the server
 executes them, but who has PHP installed on their server, right?  :)
 
 Next the functions that check if an extension is valid and that uploads
@@ -57,8 +55,8 @@ the file and redirects the user to the URL for the uploaded file::
                 flash('No file part')
                 return redirect(request.url)
             file = request.files['file']
-            # if user does not select file, browser also
-            # submit an empty part without filename
+            # If the user does not select a file, the browser submits an
+            # empty file without a filename.
             if file.filename == '':
                 flash('No selected file')
                 return redirect(request.url)
@@ -137,10 +135,10 @@ Improving Uploads
 .. versionadded:: 0.6
 
 So how exactly does Flask handle uploads?  Well it will store them in the
-webserver's memory if the files are reasonable small otherwise in a
+webserver's memory if the files are reasonably small, otherwise in a
 temporary location (as returned by :func:`tempfile.gettempdir`).  But how
 do you specify the maximum file size after which an upload is aborted?  By
-default Flask will happily accept file uploads to an unlimited amount of
+default Flask will happily accept file uploads with an unlimited amount of
 memory, but you can limit that by setting the ``MAX_CONTENT_LENGTH``
 config key::
 
@@ -169,10 +167,9 @@ Upload Progress Bars
 
 A while ago many developers had the idea to read the incoming file in
 small chunks and store the upload progress in the database to be able to
-poll the progress with JavaScript from the client.  Long story short: the
-client asks the server every 5 seconds how much it has transmitted
-already.  Do you realize the irony?  The client is asking for something it
-should already know.
+poll the progress with JavaScript from the client. The client asks the
+server every 5 seconds how much it has transmitted, but this is
+something it should already know.
 
 An Easier Solution
 ------------------
@@ -183,8 +180,8 @@ construction of progress bar.
 
 Because the common pattern for file uploads exists almost unchanged in all
 applications dealing with uploads, there is also a Flask extension called
-`Flask-Uploads`_ that implements a full fledged upload mechanism with white and
-blacklisting of extensions and more.
+`Flask-Uploads`_ that implements a full fledged upload mechanism that
+allows controlling which file extensions are allowed to be uploaded.
 
 .. _jQuery: https://jquery.com/
-.. _Flask-Uploads: https://pythonhosted.org/Flask-Uploads/
+.. _Flask-Uploads: https://flask-uploads.readthedocs.io/en/latest/

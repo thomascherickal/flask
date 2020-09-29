@@ -1,5 +1,3 @@
-.. _patterns:
-
 Patterns for Flask
 ==================
 
@@ -20,7 +18,6 @@ collected in the following pages.
    packages
    appfactories
    appdispatch
-   apierrors
    urlprocessors
    distribute
    fabric
@@ -33,7 +30,6 @@ collected in the following pages.
    templateinheritance
    flashing
    jquery
-   errorpages
    lazyloading
    mongoengine
    favicon

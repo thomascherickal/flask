@@ -1,11 +1,3 @@
-# -*- coding: utf-8 -*-
-"""
-    tests.conftest
-    ~~~~~~~~~~~~~~
-
-    :copyright: 2010 Pallets
-    :license: BSD-3-Clause
-"""
 import os
 import pkgutil
 import sys
@@ -81,9 +73,15 @@ def client(app):
 
 @pytest.fixture
 def test_apps(monkeypatch):
-    monkeypatch.syspath_prepend(
-        os.path.abspath(os.path.join(os.path.dirname(__file__), "test_apps"))
-    )
+    monkeypatch.syspath_prepend(os.path.join(os.path.dirname(__file__), "test_apps"))
+    original_modules = set(sys.modules.keys())
+
+    yield
+
+    # Remove any imports cached during the test. Otherwise "import app"
+    # will work in the next test even though it's no longer on the path.
+    for key in sys.modules.keys() - original_modules:
+        sys.modules.pop(key)
 
 
 @pytest.fixture(autouse=True)
@@ -112,14 +110,13 @@ def limit_loader(request, monkeypatch):
     if not request.param:
         return
 
-    class LimitedLoader(object):
+    class LimitedLoader:
         def __init__(self, loader):
             self.loader = loader
 
         def __getattr__(self, name):
-            if name in ("archive", "get_filename"):
-                msg = "Mocking a loader which does not have `%s.`" % name
-                raise AttributeError(msg)
+            if name in {"archive", "get_filename"}:
+                raise AttributeError(f"Mocking a loader which does not have {name!r}.")
             return getattr(self.loader, name)
 
     old_get_loader = pkgutil.get_loader
@@ -149,7 +146,7 @@ def site_packages(modules_tmpdir, monkeypatch):
     """Create a fake site-packages."""
     rv = (
         modules_tmpdir.mkdir("lib")
-        .mkdir("python{x[0]}.{x[1]}".format(x=sys.version_info))
+        .mkdir(f"python{sys.version_info.major}.{sys.version_info.minor}")
         .mkdir("site-packages")
     )
     monkeypatch.syspath_prepend(str(rv))
@@ -162,23 +159,21 @@ def install_egg(modules_tmpdir, monkeypatch):
     sys.path."""
 
     def inner(name, base=modules_tmpdir):
-        if not isinstance(name, str):
-            raise ValueError(name)
         base.join(name).ensure_dir()
         base.join(name).join("__init__.py").ensure()
 
         egg_setup = base.join("setup.py")
         egg_setup.write(
             textwrap.dedent(
-                """
-        from setuptools import setup
-        setup(name='{0}',
-              version='1.0',
-              packages=['site_egg'],
-              zip_safe=True)
-        """.format(
-                    name
+                f"""
+                from setuptools import setup
+                setup(
+                    name="{name}",
+                    version="1.0",
+                    packages=["site_egg"],
+                    zip_safe=True,
                 )
+                """
             )
         )
 
@@ -187,7 +182,7 @@ def install_egg(modules_tmpdir, monkeypatch):
         subprocess.check_call(
             [sys.executable, "setup.py", "bdist_egg"], cwd=str(modules_tmpdir)
         )
-        egg_path, = modules_tmpdir.join("dist/").listdir()
+        (egg_path,) = modules_tmpdir.join("dist/").listdir()
         monkeypatch.syspath_prepend(str(egg_path))
         return egg_path
 
